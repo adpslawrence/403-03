@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小火龍卡丁車 - 雙重世界</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Russo One', sans-serif;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #111;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI 層 */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.6) 100%);
+        }
+
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            color: #fff;
+            text-shadow: 3px 3px 0 #000, 0 0 10px #0ff;
+            font-size: 28px;
+            transform: skewX(-10deg);
+            letter-spacing: 2px;
+        }
+
+        .score-box { color: #0ff; }
+        .speed-box { color: #f0f; }
+        
+        /* 關卡指示器 */
+        .level-indicator {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            font-size: 20px;
+            color: #ffd700;
+            text-shadow: 2px 2px 0 #000;
+            transform: skewX(-10deg);
+        }
+
+        /* 遊戲選單畫面 */
+        #menu-screen, #game-over-screen, #victory-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 0, 20, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+
+        /* 通知系統 */
+        #unlock-notification {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%) skewX(-10deg) scale(0);
+            text-align: center;
+            pointer-events: none;
+            z-index: 20;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #unlock-notification.show {
+            transform: translate(-50%, -50%) skewX(-10deg) scale(1);
+        }
+
+        #unlock-notification h2 {
+            font-size: 4rem;
+            margin: 0;
+            color: #ffd700;
+            text-shadow: 4px 4px 0 #000, 0 0 30px #ffd700;
+            text-transform: uppercase;
+            font-style: italic;
+        }
+        
+        #unlock-notification p {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 0;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        h1 {
+            color: #ff0055;
+            font-size: 4.5rem;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            text-shadow: 4px 4px 0px #000, 0 0 20px #ff0055;
+            font-style: italic;
+            text-align: center;
+            transform: skewX(-10deg);
+        }
+
+        #victory-screen h1 {
+            color: #ffd700;
+            text-shadow: 4px 4px 0px #000, 0 0 30px #ffd700;
+        }
+
+        p.subtitle {
+            color: #00ffff;
+            font-size: 1.5rem;
+            margin-bottom: 50px;
+            text-shadow: 0 0 10px #00ffff;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff0055, #ff5500);
+            border: none;
+            padding: 20px 60px;
+            font-size: 28px;
+            color: #fff;
+            font-family: 'Russo One', sans-serif;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.6);
+            transform: skewX(-15deg);
+            transition: all 0.2s;
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+        }
+
+        .btn:hover {
+            transform: skewX(-15deg) scale(1.1);
+            box-shadow: 0 0 40px rgba(255, 0, 85, 0.8);
+        }
+
+        .btn:active {
+            transform: skewX(-15deg) scale(0.95);
+        }
+
+        .controls-hint {
+            margin-top: 40px;
+            color: #aaa;
+            font-size: 14px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .key {
+            display: inline-block;
+            background: rgba(255,255,255,0.1);
+            padding: 5px 12px;
+            border: 1px solid #fff;
+            color: #fff;
+        }
+
+        #mobile-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            display: none;
+            justify-content: space-between;
+            padding: 0 40px;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .touch-btn {
+            width: 90px;
+            height: 90px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            border-radius: 10px;
+            pointer-events: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            color: #0ff;
+            user-select: none;
+            transform: skewX(-10deg);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+        }
+
+        .touch-btn:active { 
+            background: rgba(0, 255, 255, 0.4); 
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
+        }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="ui-layer">
+        <div class="hud">
+            <div class="score-box">DIST <span id="scoreDisplay">0</span> KM / 50000</div>
+            <div class="speed-box">SPEED <span id="speedDisplay">0</span> KM/H</div>
+        </div>
+        <div class="level-indicator">CURRENT ZONE: <span id="levelDisplay">NEON HIGHWAY</span></div>
+        
+        <!-- 升級通知 -->
+        <div id="unlock-notification">
+            <h2 id="notif-title">NEW CAR!</h2>
+            <p id="notif-desc">SQUIRTLE MODEL UNLOCKED</p>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="menu-screen">
+        <h1>NEON<br>RACING</h1>
+        <p class="subtitle">2 個世界．5 輛傳奇賽車<br>你能征服熔岩煉獄嗎？</p>
+        <button class="btn" onclick="startGame()">START ENGINE</button>
+        <div class="controls-hint">
+            <div><span class="key">←</span> <span class="key">→</span> 變換車道</div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="hidden">
+        <h1 style="color: #00ffff; text-shadow: 0 0 20px #00ffff;">WRECKED</h1>
+        <p class="subtitle">DISTANCE: <span id="finalScore" style="color:#fff;">0</span> KM</p>
+        <button class="btn" onclick="startGame()">RETRY</button>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="hidden">
+        <h1>LEGENDARY<br>DRIVER</h1>
+        <p class="subtitle">50,000 KM 達成！<br>你已征服所有關卡！</p>
+        <button class="btn" onclick="startGame()">PLAY AGAIN</button>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="touch-btn" id="btn-left" ontouchstart="handleTouchStart('left')" ontouchend="handleTouchEnd('left')">◀</div>
+        <div class="touch-btn" id="btn-right" ontouchstart="handleTouchStart('right')" ontouchend="handleTouchEnd('right')">▶</div>
+    </div>
+</div>
+
+<script>
+    // --- 遊戲設定 ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let gameState = 'MENU'; 
+    let frameId;
+    let score = 0; // 距離 (KM)
+    const targetScore = 50000; 
+    const level2Score = 25000; // 第二關門檻
+    let currentLevel = 1;
+
+    let gameSpeed = 0;
+    const maxSpeed = 160; 
+    let cameraShake = 0;
+    
+    // 資源庫
+    const assets = {
+        charmander: null,
+        squirtle: null,
+        bulbasaur: null,
+        gengar: null,
+        pikachu_car: null,
+        pikachu: null,
+        jigglypuff: null
+    };
+    
+    const player = {
+        x: 0, y: 0, width: 60, height: 60, dx: 0, tilt: 0, 
+        spriteKey: 'charmander' 
+    };
+    
+    // 里程碑管理
+    let nextMilestone = 10000;
+    const milestones = [
+        { dist: 10000, key: 'squirtle', name: 'SQUIRTLE KART', type: 'car' },
+        { dist: 20000, key: 'bulbasaur', name: 'BULBASAUR OFF-ROAD', type: 'car' },
+        { dist: 25000, key: 'level2', name: 'ENTER MAGMA ZONE', type: 'level' }, // 關卡切換
+        { dist: 30000, key: 'gengar', name: 'GENGAR GHOST', type: 'car' },
+        { dist: 40000, key: 'pikachu_car', name: 'PIKACHU BOLT', type: 'car' }
+    ];
+
+    const segmentCount = 20; 
+    let totalDistance = 0; 
+    let roadCurve = 0; 
+    
+    let objects = []; 
+    let particles = [];
+    
+    const keys = { ArrowLeft: false, ArrowRight: false, a: false, d: false };
+
+    // --- 初始化 ---
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        
+        window.addEventListener('keydown', (e) => {
+            if(keys.hasOwnProperty(e.key)) keys[e.key] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if(keys.hasOwnProperty(e.key)) keys[e.key] = false;
+        });
+
+        if('ontouchstart' in window) {
+            document.getElementById('mobile-controls').style.display = 'flex';
+        }
+        
+        // 預先生成所有資產
+        assets.charmander = createKartSprite('charmander');
+        assets.squirtle = createKartSprite('squirtle');
+        assets.bulbasaur = createKartSprite('bulbasaur');
+        assets.gengar = createKartSprite('gengar');
+        assets.pikachu_car = createKartSprite('pikachu_car');
+        assets.pikachu = createKartSprite('pikachu');
+        assets.jigglypuff = createKartSprite('jigglypuff');
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    // --- SVG 精靈工廠 ---
+    function createKartSprite(type) {
+        let svgContent = '';
+        
+        if (['charmander', 'squirtle', 'bulbasaur', 'gengar', 'pikachu_car'].includes(type)) {
+            let bodyColor = '#3366cc';
+            let headColor = '#ff5533'; 
+            let eyeColor = '#000';
+            let featurePath = ''; 
+            let wheelColor = '#222';
+            
+            if (type === 'charmander') {
+                bodyColor = '#dd3333'; headColor = '#ff5533';
+                featurePath = '<path d="M25,40 Q20,30 25,25 Q30,30 25,40" fill="#ffcc00"><animate attributeName="d" values="M25,40 Q20,30 25,25 Q30,30 25,40; M25,40 Q15,30 20,20 Q35,30 25,40; M25,40 Q20,30 25,25 Q30,30 25,40" dur="0.5s" repeatCount="indefinite"/></path>';
+            } else if (type === 'squirtle') {
+                bodyColor = '#3399ff'; headColor = '#66ccff'; 
+                featurePath = '<circle cx="20" cy="40" r="10" fill="#8B4513" />'; 
+            } else if (type === 'bulbasaur') {
+                bodyColor = '#44aa44'; headColor = '#99cc99'; 
+                featurePath = '<path d="M25,40 L15,30 L35,30 Z" fill="#228822" />';
+            } else if (type === 'gengar') {
+                bodyColor = '#4b0082'; headColor = '#800080'; eyeColor = '#ff0000'; 
+                featurePath = '<path d="M40,25 L30,10 L50,20 L70,10 L60,25" fill="#800080" />';
+            } else if (type === 'pikachu_car') {
+                bodyColor = '#FDD835'; // 金黃色
+                headColor = '#FDD835';
+                wheelColor = '#444';
+                featurePath = `
+                    <circle cx="30" cy="38" r="4" fill="#F44336" />
+                    <circle cx="70" cy="38" r="4" fill="#F44336" />
+                    <path d="M50,20 L60,10 L55,30 L70,25 L50,50" fill="#FDD835" stroke="#000" stroke-width="2"/>
+                `;
+            }
+
+            svgContent = `
+                <ellipse cx="50" cy="90" rx="40" ry="10" fill="rgba(0,0,0,0.5)" />
+                <path d="M20,60 L80,60 L90,80 L10,80 Z" fill="${bodyColor}" stroke="#111" stroke-width="2"/>
+                <rect x="25" y="50" width="50" height="20" rx="5" fill="${bodyColor}" filter="brightness(1.1)" />
+                <rect x="5" y="65" width="15" height="20" rx="3" fill="${wheelColor}" />
+                <rect x="80" y="65" width="15" height="20" rx="3" fill="${wheelColor}" />
+                <rect x="8" y="70" width="8" height="10" fill="#666" />
+                <rect x="83" y="70" width="8" height="10" fill="#666" />
+                <circle cx="50" cy="40" r="18" fill="${headColor}" />
+                <circle cx="55" cy="35" r="5" fill="#fff" />
+                <circle cx="56" cy="35" r="2" fill="${eyeColor}" />
+                ${featurePath}
+                <ellipse cx="35" cy="55" rx="5" ry="3" fill="${headColor}" />
+                <ellipse cx="65" cy="55" rx="5" ry="3" fill="${headColor}" />
+                <rect x="35" y="50" width="30" height="5" fill="#111" />
+            `;
+        } else {
+            // 觀眾
+            if (type === 'pikachu') {
+                svgContent = `
+                    <ellipse cx="50" cy="90" rx="30" ry="8" fill="rgba(0,0,0,0.3)" />
+                    <path d="M30,20 L10,0 L35,30 Z" fill="#FDD835" stroke="#222" stroke-width="2"/>
+                    <path d="M70,20 L90,0 L65,30 Z" fill="#FDD835" stroke="#222" stroke-width="2"/>
+                    <ellipse cx="50" cy="60" rx="35" ry="30" fill="#FDD835" />
+                    <circle cx="35" cy="55" r="4" fill="#000" />
+                    <circle cx="65" cy="55" r="4" fill="#000" />
+                    <circle cx="30" cy="65" r="5" fill="#F44336" />
+                    <circle cx="70" cy="65" r="5" fill="#F44336" />
+                    <path d="M45,65 Q50,70 55,65" fill="none" stroke="#000" stroke-width="2" />
+                    <ellipse cx="20" cy="40" rx="8" ry="15" fill="#FDD835" />
+                    <ellipse cx="80" cy="40" rx="8" ry="15" fill="#FDD835" />
+                `;
+            } else if (type === 'jigglypuff') {
+                svgContent = `
+                    <ellipse cx="50" cy="90" rx="25" ry="8" fill="rgba(0,0,0,0.3)" />
+                    <path d="M25,25 L20,10 L40,30 Z" fill="#F8BBD0" stroke="#222" stroke-width="1"/>
+                    <path d="M75,25 L80,10 L60,30 Z" fill="#F8BBD0" stroke="#222" stroke-width="1"/>
+                    <circle cx="50" cy="55" r="35" fill="#F8BBD0" />
+                    <circle cx="50" cy="25" r="8" fill="#F8BBD0" stroke="#d897ad" stroke-width="2"/>
+                    <circle cx="35" cy="50" r="10" fill="#fff" />
+                    <circle cx="35" cy="50" r="6" fill="#29B6F6" />
+                    <circle cx="65" cy="50" r="10" fill="#fff" />
+                    <circle cx="65" cy="50" r="6" fill="#29B6F6" />
+                    <circle cx="20" cy="50" r="8" fill="#F8BBD0" />
+                    <circle cx="80" cy="50" r="8" fill="#F8BBD0" />
+                `;
+            }
+        }
+        const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">${svgContent}</svg>`;
+        const img = new Image();
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+        return img;
+    }
+
+    // --- 粒子系統 ---
+    class Particle {
+        constructor(x, y, type) {
+            this.x = x;
+            this.y = y;
+            this.type = type; 
+            this.life = 1.0;
+
+            if (type === 'spark') {
+                this.size = Math.random() * 4 + 2;
+                this.speedX = (Math.random() - 0.5) * 10;
+                this.speedY = (Math.random()) * -5;
+                this.color = `hsl(${Math.random()*60 + 10}, 100%, 70%)`; 
+                this.decay = 0.05;
+            } else if (type === 'flame') {
+                this.size = Math.random() * 10 + 5;
+                this.speedX = (Math.random() - 0.5) * 2;
+                this.speedY = Math.random() * 5 + 2;
+                this.color = `hsl(${Math.random()*40 + 180}, 100%, 60%)`; 
+                this.decay = 0.08;
+            } else if (type === 'unlock') {
+                this.size = Math.random() * 8 + 4;
+                this.speedX = (Math.random() - 0.5) * 15;
+                this.speedY = (Math.random() - 0.5) * 15;
+                this.color = '#fff';
+                this.decay = 0.02;
+            } else { 
+                this.size = Math.random() * 5 + 2;
+                this.speedX = (Math.random() - 0.5) * 2;
+                this.speedY = Math.random() * 2 + 1;
+                this.color = '#888';
+                this.decay = 0.03;
+            }
+        }
+        update() {
+            this.life -= this.decay;
+            this.x += this.speedX;
+            this.y -= this.speedY; 
+            this.size *= 0.9;
+        }
+        draw(ctx) {
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            if (this.type === 'flame') {
+                ctx.moveTo(this.x, this.y - this.size);
+                ctx.lineTo(this.x + this.size/2, this.y);
+                ctx.lineTo(this.x, this.y + this.size);
+                ctx.lineTo(this.x - this.size/2, this.y);
+            } else {
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            }
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function spawnParticle(x, y, type) {
+        particles.push(new Particle(x, y, type));
+    }
+
+    // --- 遊戲邏輯 ---
+    function startGame() {
+        document.getElementById('menu-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('victory-screen').classList.add('hidden');
+        gameState = 'PLAYING';
+        score = 0;
+        gameSpeed = 0;
+        totalDistance = 0;
+        player.x = 0;
+        player.dx = 0;
+        player.spriteKey = 'charmander'; 
+        
+        // 重置關卡狀態
+        currentLevel = 1;
+        document.getElementById('levelDisplay').innerText = "NEON HIGHWAY";
+        document.getElementById('levelDisplay').style.color = "#00ffff";
+        
+        // 重置里程碑
+        nextMilestone = 10000; 
+        
+        objects = [];
+        particles = [];
+        
+        spawnRival(-0.5, 2, 'squirtle');
+        spawnRival(0.5, 3, 'gengar');
+
+        if(frameId) cancelAnimationFrame(frameId);
+        gameLoop();
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        document.getElementById('finalScore').innerText = Math.floor(score);
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    function victory() {
+        gameState = 'VICTORY';
+        document.getElementById('victory-screen').classList.remove('hidden');
+    }
+
+    function showUnlockNotification(title, desc) {
+        const notif = document.getElementById('unlock-notification');
+        document.getElementById('notif-title').innerText = title;
+        document.getElementById('notif-desc').innerText = desc;
+        notif.classList.add('show');
+        setTimeout(() => {
+            notif.classList.remove('show');
+        }, 3000);
+    }
+
+    function handleTouchStart(dir) {
+        if(dir === 'left') keys.ArrowLeft = true;
+        if(dir === 'right') keys.ArrowRight = true;
+    }
+    function handleTouchEnd(dir) {
+        if(dir === 'left') keys.ArrowLeft = false;
+        if(dir === 'right') keys.ArrowRight = false;
+    }
+
+    function update() {
+        if (gameState !== 'PLAYING') return;
+
+        if (gameSpeed < 1.0) gameSpeed += 0.008; 
+        score += gameSpeed * 10;
+        totalDistance += gameSpeed;
+
+        // 關卡切換邏輯
+        if (score >= level2Score && currentLevel === 1) {
+            currentLevel = 2;
+            document.getElementById('levelDisplay').innerText = "MAGMA ZONE";
+            document.getElementById('levelDisplay').style.color = "#ff3300";
+            // 轉場特效會由里程碑觸發
+        }
+
+        // 檢查里程碑 (升級車輛 / 關卡通知)
+        // 這裡我們需要一個迴圈，防止一次跳太多分錯過
+        while (milestones.length > 0 && score >= milestones[0].dist) {
+            const m = milestones.shift(); // 取出並移除第一個
+            
+            if (m.type === 'car') {
+                player.spriteKey = m.key;
+                showUnlockNotification("NEW CAR!", m.name + " UNLOCKED");
+                for(let i=0; i<30; i++) spawnParticle(canvas.width/2, canvas.height - 100, 'unlock');
+            } else if (m.type === 'level') {
+                showUnlockNotification("WARNING!", "ENTERING MAGMA ZONE");
+                // 可以加一些畫面震動或閃光
+                cameraShake = 20; 
+            }
+        }
+
+        if (score >= targetScore) {
+            victory();
+            return;
+        }
+        
+        // 物理
+        const acceleration = 0.005;
+        const friction = 0.94;
+        const maxDrift = 0.09;
+
+        if (keys.ArrowLeft || keys.a) {
+            player.dx -= acceleration;
+            player.tilt = -1;
+        } else if (keys.ArrowRight || keys.d) {
+            player.dx += acceleration;
+            player.tilt = 1;
+        } else {
+            player.tilt = 0;
+        }
+
+        player.dx *= friction;
+        if (player.dx > maxDrift) player.dx = maxDrift;
+        if (player.dx < -maxDrift) player.dx = -maxDrift;
+
+        player.x += player.dx * (gameSpeed + 0.5);
+        roadCurve = 0;
+
+        if (player.x < -0.95) player.x = -0.95;
+        if (player.x > 0.95) player.x = 0.95;
+
+        // 震動衰減
+        if (cameraShake > 0) cameraShake *= 0.9;
+        // 速度震動
+        if (gameSpeed > 0.8 && cameraShake < 2) {
+            cameraShake = (gameSpeed - 0.8) * 8;
+        }
+
+        document.getElementById('scoreDisplay').innerText = Math.floor(score);
+        document.getElementById('speedDisplay').innerText = Math.floor(gameSpeed * maxSpeed);
+
+        // --- 物體更新 ---
+        const rivals = objects.filter(o => o.isNpc && !o.isFan);
+        if (rivals.length < 2 && Math.random() < 0.05) {
+            const types = ['squirtle', 'bulbasaur', 'gengar'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            spawnRival((Math.random() * 1.4) - 0.7, 5, type);
+        }
+
+        if (Math.random() < 0.1 * gameSpeed) { 
+            spawnFan(-1.8 - Math.random() * 0.5, 5); 
+            spawnFan(1.8 + Math.random() * 0.5, 5);
+        }
+
+        for (let i = objects.length - 1; i >= 0; i--) {
+            let obj = objects[i];
+            let relSpeed = 0;
+
+            if (obj.isFan) {
+                relSpeed = gameSpeed * 0.15;
+            } else if (obj.isNpc) {
+                let targetSpeed = gameSpeed;
+                if (obj.z > 2) targetSpeed = gameSpeed * 0.85;
+                else if (obj.z < -0.2) targetSpeed = gameSpeed * 1.15;
+                else targetSpeed = gameSpeed * (0.95 + Math.random() * 0.1);
+                
+                obj.speed += (targetSpeed - obj.speed) * 0.05;
+                
+                obj.laneChangeTimer = (obj.laneChangeTimer || 0) + 1;
+                if (obj.laneChangeTimer > 100 && Math.random() < 0.02) {
+                    obj.targetX = (Math.random() * 1.4) - 0.7; 
+                    obj.laneChangeTimer = 0;
+                }
+                
+                if (obj.x > 0.8) obj.targetX = 0.4;
+                if (obj.x < -0.8) obj.targetX = -0.4;
+                if (obj.x > 0.9) obj.x = 0.9;
+                if (obj.x < -0.9) obj.x = -0.9;
+
+                if (obj.targetX !== undefined) {
+                    obj.x += (obj.targetX - obj.x) * 0.05;
+                }
+                relSpeed = (gameSpeed - obj.speed) * 0.15;
+            }
+
+            obj.z -= relSpeed;
+
+            if (!obj.isFan && obj.z < 0.1 && obj.z > -0.1) {
+                const playerWidth = 0.3; 
+                const objWidth = 0.3;
+                if (Math.abs(obj.x - player.x) < (playerWidth/2 + objWidth/2)) {
+                    gameOver();
+                }
+            }
+
+            if (obj.isNpc && !obj.isFan) {
+                if (obj.z < -2 || obj.z > 6) objects.splice(i, 1);
+            } else {
+                if (obj.z < -0.5) objects.splice(i, 1);
+            }
+        }
+        
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function spawnRival(x, z, type) {
+        if (x < -0.7) x = -0.7;
+        if (x > 0.7) x = 0.7;
+        objects.push({
+            x: x, z: z, type: type, isNpc: true, isFan: false,
+            speed: gameSpeed * 1.1, laneChangeTimer: 0, targetX: x
+        });
+    }
+
+    function spawnFan(x, z) {
+        const type = Math.random() > 0.5 ? 'pikachu' : 'jigglypuff';
+        objects.push({
+            x: x, z: z, type: type, isNpc: false, isFan: true,
+            id: Math.random() * 100, speed: 0
+        });
+    }
+
+    // --- 繪圖 ---
+
+    function drawSun(ctx, cx, cy) {
+        const radius = 60;
+        const gradient = ctx.createLinearGradient(cx, cy - radius, cx, cy + radius);
+        
+        // 根據關卡改變太陽顏色
+        if (currentLevel === 1) {
+            gradient.addColorStop(0, '#ffff00');
+            gradient.addColorStop(1, '#ff0055');
+        } else {
+            gradient.addColorStop(0, '#fff'); // 白熱
+            gradient.addColorStop(1, '#ff0000'); // 血紅
+        }
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = currentLevel === 1 ? '#20002c' : '#220000'; // 切割線背景色
+        for(let i = 0; i < 10; i++) {
+            const h = radius * 2 / 10;
+            const y = cy + i * h * 0.6; 
+            if (y > cy) {
+                ctx.fillRect(cx - radius, y, radius*2, h * 0.2 + (i*0.5));
+            }
+        }
+    }
+
+    function draw() {
+        const shakeX = (Math.random() - 0.5) * cameraShake;
+        const shakeY = (Math.random() - 0.5) * cameraShake;
+
+        ctx.save();
+        ctx.translate(shakeX, shakeY);
+
+        const horizonY = canvas.height * 0.45; 
+        
+        // 天空顏色設定
+        const skyGradient = ctx.createLinearGradient(0, 0, 0, horizonY);
+        if (currentLevel === 1) {
+            skyGradient.addColorStop(0, '#0f0c29'); 
+            skyGradient.addColorStop(0.5, '#302b63'); 
+            skyGradient.addColorStop(1, '#24243e'); 
+        } else {
+            // Level 2: Magma Sky
+            skyGradient.addColorStop(0, '#1a0000'); 
+            skyGradient.addColorStop(0.5, '#4d0000'); 
+            skyGradient.addColorStop(1, '#ff3300'); 
+        }
+        
+        ctx.fillStyle = skyGradient;
+        ctx.fillRect(-10, -10, canvas.width+20, horizonY+20);
+
+        ctx.save();
+        drawSun(ctx, canvas.width * 0.5, horizonY * 0.6);
+        
+        // 遠景山脈
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.moveTo(0, horizonY);
+        for(let i=0; i<=10; i++) {
+            ctx.lineTo(canvas.width/10 * i, horizonY - Math.random() * 50 - 20);
+        }
+        ctx.lineTo(canvas.width, horizonY);
+        ctx.fill();
+        ctx.strokeStyle = currentLevel === 1 ? '#f0f' : '#ffaa00'; // 山脈邊緣色
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+
+        // 賽道
+        const cx = canvas.width / 2;
+        const maxW = canvas.width;
+        const maxH = canvas.height;
+        const roadWidthBase = maxW * 0.9;
+        const roadWidthTop = 20;
+        const stripCount = 30; 
+
+        for(let i = 0; i < stripCount; i++) {
+            const offset = Math.floor(totalDistance * 3) % 2; 
+            const isDark = (i + offset) % 2 === 0;
+            
+            const t1 = i / stripCount;
+            const t2 = (i + 1) / stripCount;
+            const p1 = Math.pow(t1, 2.5); 
+            const p2 = Math.pow(t2, 2.5);
+            
+            const y1 = horizonY + (maxH - horizonY) * p1;
+            const y2 = horizonY + (maxH - horizonY) * p2;
+            
+            const w1 = roadWidthTop + (roadWidthBase - roadWidthTop) * p1;
+            const w2 = roadWidthTop + (roadWidthBase - roadWidthTop) * p2;
+            
+            const xOff1 = 0;
+            const xOff2 = 0;
+
+            // 地面顏色
+            let grassColor;
+            if (currentLevel === 1) {
+                grassColor = '#100018'; // 深紫
+            } else {
+                grassColor = '#1a0500'; // 深紅棕
+            }
+            
+            ctx.fillStyle = grassColor;
+            ctx.fillRect(0, y1, maxW, y2-y1 + 1);
+            
+            // 網格線 (Level 2 變成岩漿裂縫色)
+            if (isDark) {
+                ctx.fillStyle = currentLevel === 1 ? 'rgba(255, 0, 255, 0.1)' : 'rgba(255, 50, 0, 0.2)';
+                ctx.fillRect(0, y1, maxW, 1);
+            }
+
+            // 路面顏色
+            const roadColor = isDark ? '#1a1a1a' : '#222';
+            const roadCx1 = cx - xOff1;
+            const roadCx2 = cx - xOff2;
+
+            ctx.fillStyle = roadColor;
+            ctx.beginPath();
+            ctx.moveTo(roadCx1 - w1/2, y1);
+            ctx.lineTo(roadCx1 + w1/2, y1);
+            ctx.lineTo(roadCx2 + w2/2, y2);
+            ctx.lineTo(roadCx2 - w2/2, y2);
+            ctx.fill();
+            
+            // 路緣石顏色
+            const kerbWidth = w2 * 0.08;
+            if (currentLevel === 1) {
+                ctx.fillStyle = isDark ? '#00ffff' : '#ff00ff'; 
+            } else {
+                ctx.fillStyle = isDark ? '#ff0000' : '#ffff00'; // 紅黃警示色
+            }
+            
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = ctx.fillStyle;
+            
+            ctx.beginPath();
+            ctx.moveTo(roadCx1 - w1/2 - kerbWidth*p1, y1);
+            ctx.lineTo(roadCx1 - w1/2, y1);
+            ctx.lineTo(roadCx2 - w2/2, y2);
+            ctx.lineTo(roadCx2 - w2/2 - kerbWidth*p2, y2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(roadCx1 + w1/2 + kerbWidth*p1, y1);
+            ctx.lineTo(roadCx1 + w1/2, y1);
+            ctx.lineTo(roadCx2 + w2/2, y2);
+            ctx.lineTo(roadCx2 + w2/2 + kerbWidth*p2, y2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0; 
+        }
+
+        // 物體
+        objects.sort((a, b) => b.z - a.z);
+        objects.forEach(obj => {
+            const drawDist = 5;
+            if (obj.z > drawDist || obj.z < -1) return;
+            const progress = 1 - (obj.z / drawDist); 
+            if (progress < 0) return;
+            
+            const p = Math.pow(progress, 2.5);
+            const sy = horizonY + (maxH - horizonY) * p;
+            const sw = (roadWidthTop + (roadWidthBase - roadWidthTop) * p); 
+            const scale = 0.5 + 2 * p; 
+            
+            const xOff = 0; 
+            const currentRoadCx = cx - xOff;
+            const sx = currentRoadCx + (obj.x * sw / 2);
+            
+            let bounceY = 0;
+            if (obj.isFan) {
+                bounceY = Math.abs(Math.sin(Date.now() * 0.01 + obj.id)) * 20 * scale; 
+            }
+
+            const sprite = assets[obj.type]; 
+            if (sprite && sprite.width > 0) {
+                const kW = sprite.width * 1.2 * scale; 
+                const kH = sprite.height * 1.2 * scale;
+                ctx.drawImage(sprite, sx - kW/2, sy - kH - bounceY, kW, kH);
+            }
+        });
+
+        // 粒子
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => p.draw(ctx));
+        ctx.globalCompositeOperation = 'source-over';
+
+        // 玩家
+        const playerScale = 1.6;
+        const playerSprite = assets[player.spriteKey]; 
+        
+        let pW = 60 * playerScale;
+        let pH = 60 * playerScale;
+        if (playerSprite && playerSprite.width > 0) {
+            pW = playerSprite.width * playerScale;
+            pH = playerSprite.height * playerScale;
+        }
+
+        const playerScreenX = cx + (player.x * roadWidthBase / 2.5); 
+        const playerScreenY = maxH - pH - 30;
+
+        // 特效
+        if (gameSpeed > 0.1) {
+            if (Math.abs(player.tilt) > 0.5) {
+                const side = player.tilt > 0 ? -1 : 1; 
+                spawnParticle(playerScreenX + (side * pW * 0.4), playerScreenY + pH, 'spark');
+            }
+            if (gameSpeed > 0.9) {
+                spawnParticle(playerScreenX - pW*0.2, playerScreenY + pH*0.5, 'flame');
+                spawnParticle(playerScreenX + pW*0.2, playerScreenY + pH*0.5, 'flame');
+            }
+        }
+
+        ctx.save();
+        ctx.translate(playerScreenX, playerScreenY);
+        if (player.tilt !== 0) ctx.rotate(player.tilt * 0.2); 
+        if (gameSpeed > 0) ctx.translate(0, Math.sin(Date.now() / 20) * 4); 
+
+        let neonColor = 'rgba(0, 255, 255, 0.4)'; 
+        if (player.spriteKey === 'charmander') neonColor = 'rgba(255, 100, 0, 0.4)';
+        else if (player.spriteKey === 'bulbasaur') neonColor = 'rgba(0, 255, 0, 0.4)';
+        else if (player.spriteKey === 'gengar') neonColor = 'rgba(150, 0, 255, 0.4)';
+        else if (player.spriteKey === 'pikachu_car') neonColor = 'rgba(255, 255, 0, 0.4)';
+
+        ctx.fillStyle = neonColor;
+        ctx.filter = 'blur(10px)';
+        ctx.beginPath();
+        ctx.ellipse(0, pH*0.4, pW*0.5, pH*0.2, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.filter = 'none';
+
+        if (playerSprite && playerSprite.width > 0) {
+            ctx.drawImage(playerSprite, -pW/2, -pH/2, pW, pH);
+        } else {
+            ctx.fillStyle = 'red';
+            ctx.fillRect(-pW/2, -pH/2, pW, pH);
+        }
+        ctx.restore();
+
+        // 速度線
+        if (gameSpeed > 0.6) {
+            ctx.strokeStyle = currentLevel === 1 ? 'rgba(0, 255, 255, 0.5)' : 'rgba(255, 100, 0, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for(let i=0; i<8; i++) {
+                const lx = Math.random() * canvas.width;
+                const ly = Math.random() * canvas.height;
+                const dx = lx - cx;
+                const dy = ly - horizonY;
+                const angle = Math.atan2(dy, dx);
+                const len = Math.random() * 100 * gameSpeed;
+                ctx.moveTo(lx, ly);
+                ctx.lineTo(lx + Math.cos(angle)*len, ly + Math.sin(angle)*len);
+            }
+            ctx.stroke();
+        }
+
+        ctx.restore(); 
+    }
+
+    function gameLoop() {
+        if (gameState === 'PLAYING') {
+            update();
+            draw();
+            frameId = requestAnimationFrame(gameLoop);
+        }
+    }
+
+    init();
+
+</script>
+</body>
+</html>
